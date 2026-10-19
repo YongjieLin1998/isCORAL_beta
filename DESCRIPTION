@@ -1,0 +1,48 @@
+Package: isCORAL
+Type: Package
+Title: Identify Structurally Correlated Genes in Single-Cell Data (Beta)
+Version: 1.0.0
+Author: Your Name <your.email@example.com>
+Maintainer: Your Name <your.email@example.com>
+Description: A scalable pipeline for identifying genes whose expression patterns define an underlying structure or state within a single-cell population. Beta 1.0.0 uses raw counts by default, supports Seurat v4 and v5 assay access, provides transcriptome-only pseudoclone inference, deterministic pseudoclone assignment, selected-gene clonal-expression visualization, experimental lineage-barcode memory-score comparison, and embedding-based Metaclone analysis, retains compatibility with historical Metaclone entry points, and stores resolved embedding parameters and provenance.
+License: MIT
+Encoding: UTF-8
+SystemRequirements: Unix-like operating system for the fork-based doMC core scan backend
+Imports: 
+    grDevices,
+    grid,
+    methods,
+    parallel,
+    stats,
+    utils,
+    Seurat,
+    dplyr,
+    magrittr,
+    foreach,
+    matrixStats,
+    kernlab,
+    RhpcBLASctl,
+    Matrix,
+    doRNG,
+    ggplot2,
+    patchwork,
+    ggrepel,
+    rlang,
+    SeuratObject,
+    RcppML,
+    RSpectra,
+    callr,
+    doMC,
+    doParallel,
+    glmnet,
+    irlba,
+    ggdendro,
+    ggrastr,
+    reshape2
+Suggests:
+    devtools,
+    roxygen2,
+    testthat,
+    scCustomize,
+    leidenbase
+RoxygenNote: 7.3.3
