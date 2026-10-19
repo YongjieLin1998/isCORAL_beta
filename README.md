@@ -326,10 +326,6 @@ Please report bugs or questions via GitHub Issues.
 
 ## Citation
 
-## License
-
-The package metadata currently declares the MIT license. 
-
 ## Development Tools
 This project leverages modern development tools to ensure code quality and efficiency. While developers write the initial code implementations, Generative AI and automated harnesses are used as assistants for tasks including:
 
