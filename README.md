@@ -70,7 +70,10 @@ The core scan relies on `callr` and the fork-based `doMC` parallel backend, supp
 ## Installation
 
 ```r
-# Installation instructions coming soon
+install.packages("remotes")
+remotes::install_github("YongjieLin1998/isCORAL_beta")
+
+library(isCORAL)
 ```
 
 ## Input requirements
