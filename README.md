@@ -194,7 +194,6 @@ memory_comparison$summary
 head(memory_comparison$comparison)
 ```
 
-- `calculate_heritable_genes()` stores ground-truth $\omega^2$ statistics, null distributions, and lightweight input provenance in `seurat_obj@misc$groundtruth`. Every call re-reads the current `DefaultAssay` log-normalized `data` and the requested metadata labels, so `group_by` or filtering parameters can be changed safely on the same object; legacy `internal_data` caches are removed automatically.
 - `CompareMemoryScores()` defines the top `top_n` (2,000) genes by experimental $\omega^2$ as the positive set, returning a gene-level `comparison` table, ROC/PR curves, and a `summary` table of benchmark metrics (AUROC, AUPRC, AUPRC enrichment, Max F1, Spearman/Pearson correlations, and RMSE).
 
 ### 4. Deterministic Pseudoclones & Clonal Expression
