@@ -1,5 +1,13 @@
 # isCORAL beta v1.0.0
 
+
+## Development and Feedback
+We are working to improve isCORAL and add new functions. Thus, your feedback and suggestions are very welcome. If you need a new specific function or find something not working, just let us know and we'll fix it.
+
+Contact: Yongjie Lin (linyjie@pku.edu.cn)
+
+
+
 ## Overview
 
 isCORAL (beta v1.0.0) is an R workflow for virtual lineage tracing from single-time-point single-cell RNA-seq data. It infers probabilistic pseudoclone relationships between cells, estimates gene-level transcriptional memory scores, constructs downstream pCORAL cell and pseudoclone embeddings, and supports Metaclone analysis in pCORAL space.
