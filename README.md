@@ -85,7 +85,7 @@ The input must be a Seurat object with unique cell names. `isCORAL()` supports t
 | `raw_counts` (default) | Raw `counts` in the selected assay | Optional UMI downsampling (`downsampleUMI`) followed by `Seurat::NormalizeData()` |
 | `pre_normalized_data` | Log-normalized matrix in `pre_normalized_layer` | Uses the supplied matrix directly; a non-`NULL` `downsampleUMI` value is ignored with a warning |
 
-- Use `input_mode = "pre_normalized_data"` when working with objects that only provide a log-normalized `data` layer (e.g., certain processed CellTag datasets).
+- Use `input_mode = "pre_normalized_data"` when working with objects that only provide a log-normalized `data` layer. 
 - isCORAL does not automatically verify that an externally supplied pre-normalized matrix uses the expected log transformation.
 - Set `species` explicitly to `"human"` or `"mouse"` to configure mitochondrial and cell-cycle gene filtering.
 
@@ -122,12 +122,12 @@ seurat_obj <- isCORAL(
   seurat_obj = seurat_obj,
   assay = "RNA",
   input_mode = "raw_counts",
-  species = "human",             # Use "mouse" for mouse data
+  species = "mouse",             # Use "human" for human data
   random_seed = 20251009,
   results_dir = "iscoral_results",
   downsampleUMI = NULL,
   bin_size = bin_size,
-  n_repeats = 100,
+  n_repeats = 100,  # The n repeat determines the significant digits of pseudoclone distribution. 
   parallel_cores = 8,            # Match allocated CPU cores
   max_cells = NULL,
   downsample_gemli_ratio = 1,
