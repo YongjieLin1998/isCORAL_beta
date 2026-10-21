@@ -1,9 +1,9 @@
 Package: isCORAL
 Type: Package
-Title: Identify Structurally Correlated Genes in Single-Cell Data (Beta)
+Title: in-silico clone reconstruction in the landscape
 Version: 1.0.0
-Author: Your Name <your.email@example.com>
-Maintainer: Your Name <your.email@example.com>
+Author: Yongjie Lin <linyjie@pku.edu.cn>
+Maintainer: Yongjie Lin <linyjie@pku.edu.cn>
 Description: A scalable pipeline for identifying genes whose expression patterns define an underlying structure or state within a single-cell population. Beta 1.0.0 uses raw counts by default, supports Seurat v4 and v5 assay access, provides transcriptome-only pseudoclone inference, deterministic pseudoclone assignment, selected-gene clonal-expression visualization, experimental lineage-barcode memory-score comparison, and embedding-based Metaclone analysis, retains compatibility with historical Metaclone entry points, and stores resolved embedding parameters and provenance.
 License: MIT
 Encoding: UTF-8
