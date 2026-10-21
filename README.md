@@ -1,13 +1,10 @@
 # isCORAL beta v1.0.0
 
-
 ## Development and Feedback
-isCORAL is currently in beta. 
-Please note that APIs and tutorials are subject to change as we actively improve the library and add new features. We warmly welcome your feedback and suggestions! 
-If you encounter any bugs or have a specific feature request, please let us know—we’d love to hear from you and get it sorted out.
+
+isCORAL is currently in beta. While we actively improve the library and add new features, existing APIs will remain backward-compatible unless otherwise noted. We warmly welcome your feedback—if you encounter any bugs or have feature requests, please let us know via GitHub Issues or email.
+
 Contact: Yongjie Lin (linyjie@pku.edu.cn)
-
-
 
 ## Overview
 
@@ -28,15 +25,10 @@ isCORAL (beta v1.0.0) is an R workflow for virtual lineage tracing from single-t
 ## Key Features
 
 - **Transcriptional memory scoring** — Computes gene-wise transcriptional memory statistics via repeated NMF feature evaluation and spectral clustering.
-
 - **Consensus pseudoclone inference** — Constructs a robust probabilistic cell co-association matrix (`S_stab`) as the pseudoclone representation.
-
 - **Deterministic pseudoclones and expression visualization** — `Assign_deterministic_pseudoclone()` derives hierarchical cluster assignments from `1 - S_stab`; `simulate_clonal_expression()` visualizes gene expression across the original UMAP and inferred pseudoclones.
-
 - **pCORAL embedding** — Combines energy distance, classical MDS, and multi-response Elastic Net to generate cell and pseudoclone embeddings.
-
 - **Metaclone analysis** — Identifies clonal communities in `CORAL_clone_embed` using Leiden or Louvain clustering.
-
 - **Seurat compatibility and provenance** — Supports Seurat v4/v5 layer/slot access with comprehensive parameter logging in `@misc`.
 
 ## Workflow
@@ -54,17 +46,20 @@ flowchart TD
     C --> I[CORALembedding]
     I --> J[CORAL_cell_embed]
     I --> K[CORAL_clone_embed]
+    J --> O[PlotCORALEmbedding]
+    K --> O
+    J --> L[PlotPseudoclone<br/>pCORAL space]
     K --> L[PlotPseudoclone<br/>pCORAL space]
     K --> M[FindMetaclone]
+    M --> N[PlotMetacloneLandscape]
 ```
 
 The memory scores and `S_stab` matrix from the core scan support two downstream paths:
 
 1. **Direct feature and pseudoclone visualization**: Select top memory genes via `PlotMemoryGenes()` and pair them with deterministic groups from `Assign_deterministic_pseudoclone()` in `simulate_clonal_expression()`, or directly map seed-cell enrichment fields from `S_stab` using `PlotPseudoclone()`.
-
 2. **pCORAL embedding and community detection**: Generate `CORAL_cell_embed` and `CORAL_clone_embed` via `CORALembedding()` for pCORAL-space visualization and `FindMetaclone()` clustering.
 
-## System requirements
+## System Requirements
 
 The core scan relies on `callr` and the fork-based `doMC` parallel backend, supporting Linux, macOS, and Unix-like HPC environments. Native Windows execution is not currently supported.
 
@@ -77,17 +72,16 @@ remotes::install_github("YongjieLin1998/isCORAL_beta")
 library(isCORAL)
 ```
 
-## Input requirements
+## Input Requirements
 
 The input must be a Seurat object with unique cell names. `isCORAL()` supports two input modes:
 
 | Mode | Required input | Normalization behavior |
 | --- | --- | --- |
 | `raw_counts` (default) | Raw `counts` in the selected assay | Optional UMI downsampling (`downsampleUMI`) followed by `Seurat::NormalizeData()` |
-| `pre_normalized_data` | Log-normalized matrix in `pre_normalized_layer` | Uses the supplied matrix directly; a non-`NULL` `downsampleUMI` value is ignored with a warning |
+| `pre_normalized_data` | Log-normalized matrix in `pre_normalized_layer` | Uses the supplied matrix directly (`downsampleUMI` is ignored) |
 
-- Use `input_mode = "pre_normalized_data"` when working with objects that only provide a log-normalized `data` layer. 
-- isCORAL does not automatically verify that an externally supplied pre-normalized matrix uses the expected log transformation.
+- Use `input_mode = "pre_normalized_data"` when working with objects that only provide a log-normalized `data` layer.
 - Set `species` explicitly to `"human"` or `"mouse"` to configure mitochondrial and cell-cycle gene filtering.
 
 ## Primary API
@@ -102,19 +96,31 @@ The input must be a Seurat object with unique cell names. `isCORAL()` supports t
 | `simulate_clonal_expression()` | Visualize observed expression of selected genes on the original UMAP and across deterministic pseudoclones |
 | `PlotPseudoclone()` | Visualize one- or two-seed pseudoclone enrichment fields on UMAP or in pCORAL space |
 | `CORALembedding()` | Construct pCORAL cell and pseudoclone embeddings |
+| `PlotCORALEmbedding()` | Plot cell or clone embeddings, using open circles in clone space |
 | `FindMetaclone()` | Detect Metaclone communities in `CORAL_clone_embed` |
+| `PlotMetacloneLandscape()` | Visualize Metaclone labels on the clone embedding, with an overall landscape and per-Metaclone facets |
+| `PlotMetaclone()` | Plot one Metaclone's seeds and inferred sister-cell cloud in cell-embedding space |
 | `SmoothEmbedding()` | Interpolate between cell and fully diffused embeddings |
 
 ## Quick Start
 
 ### 1. Run the Core Scan
 
-The example below runs the core scan using the default `raw_counts` mode:
+The example below uses the default `raw_counts` mode. Recommended settings:
+
+- **Bin size:** Start with `bin_size = N / 50`, where `N` is the number of cells used in the scan. After cell downsampling, use the retained cell count.
+- **Quick test:** Use `max_cells = 2000L` and `n_repeats = 10L` to run on up to 2,000 randomly selected cells. Save the test result as `seurat_obj_test`; use the full input for the final analysis.
+- **Repeats:** Use `n_repeats = 100` for a full analysis. More repeats provide finer consensus resolution and more stable pseudoclone and memory-score estimates, with longer runtime.
 
 ```r
 library(isCORAL)
 
-bin_size <- 200L
+max_cells <- NULL   # Use 2000L for a quick test
+n_repeats <- 100L   # Use 10L for a quick test
+
+n_cells_scan <- ncol(seurat_obj)
+if (!is.null(max_cells)) n_cells_scan <- min(n_cells_scan, max_cells)
+bin_size <- max(2L, as.integer(round(n_cells_scan / 50)))
 binsize_key <- paste0("binsize_", bin_size)
 
 set.seed(20251009)
@@ -128,15 +134,15 @@ seurat_obj <- isCORAL(
   results_dir = "iscoral_results",
   downsampleUMI = NULL,
   bin_size = bin_size,
-  n_repeats = 100,  # The n repeat determines the significant digits of pseudoclone distribution. 
+  n_repeats = n_repeats,
   parallel_cores = 8,            # Match allocated CPU cores
-  max_cells = NULL,
+  max_cells = max_cells,
   downsample_gemli_ratio = 1,
   nmf_eval_downsample_cells = NULL
 )
 ```
 
-When at least two valid repeats are available, scan results are stored in `seurat_obj@misc$CORAL_scan_results[[binsize_key]]`; progress logs are written to `results_dir/logs`.
+Scan results are stored in `seurat_obj@misc$CORAL_scan_results[[binsize_key]]`; progress logs are written to `results_dir/logs`.
 
 ### 2. Visualize Top Memory Genes
 
@@ -180,7 +186,7 @@ seurat_obj <- calculate_heritable_genes(
 )
 ```
 
-Then use the public API to perform the memory-score benchmark comparison:
+Then compare the inferred memory scores against the experimental ground truth:
 
 ```r
 memory_comparison <- CompareMemoryScores(
@@ -193,9 +199,17 @@ memory_comparison <- CompareMemoryScores(
 
 memory_comparison$summary
 head(memory_comparison$comparison)
+
+print(memory_comparison$plots$scatter)
+print(memory_comparison$plots$roc)
+print(memory_comparison$plots$pr)
 ```
 
-- `CompareMemoryScores()` defines the top `top_n` (2,000) genes by experimental $\omega^2$ as the positive set, returning a gene-level `comparison` table, ROC/PR curves, and a `summary` table of benchmark metrics (AUROC, AUPRC, AUPRC enrichment, Max F1, Spearman/Pearson correlations, and RMSE).
+- `CompareMemoryScores()` defines the top `top_n` (2,000) genes by experimental $\omega^2$ as the positive set, returning a gene-level `comparison` table, curve coordinates (`roc_curve` / `pr_curve`), formatted ggplot objects in `plots`, and a `summary` table of benchmark metrics (AUROC, AUPRC, AUPRC enrichment, Max F1, Spearman/Pearson correlations, and RMSE).
+- `plots$scatter` compares experimental $\omega^2$ on the x-axis with inferred memory scores on the y-axis, displaying an identity line, linear fit, TP/TN/FP/FN classifications, and labels for the top five TP genes. The horizontal cutoff maximizes F1, and the vertical cutoff marks the ground-truth top-`top_n` boundary.
+- `plots$roc` and `plots$pr` show the ROC and precision-recall curves against random baselines (dashed lines), with a diamond marking Max F1 on the PR curve.
+
+Use `label_top_n = 0` to omit gene labels, or `make_plots = FALSE` to return tables and metrics only.
 
 ### 4. Deterministic Pseudoclones & Clonal Expression
 
@@ -250,6 +264,25 @@ print(p_pseudoclone_umap)
 
 `PlotPseudoclone()` accepts one or two seed cells (randomly sampling one if omitted). It plots enrichment derived from row-normalized probabilities: for seed cell $s$ and target cell $j$, $\text{Enrichment}(s, j) = P_{\text{norm}}(s, j) \times (N - 1)$.
 
+**Compare with experimental clones (optional)**
+
+If experimental clone labels are stored in `barcode`, pass `clone_col = "barcode"` together with `show_ground_truth = TRUE`. Choose a `seed_cell` with a valid experimental barcode (or cells from two different clones when plotting two seeds):
+
+```r
+p_pseudoclone_umap_gt <- PlotPseudoclone(
+  seurat_obj = seurat_obj,
+  seed_cell = seed_cell,
+  clone_col = "barcode",
+  binsize_key = binsize_key,
+  reduction = "umap",
+  show_ground_truth = TRUE
+)
+
+print(p_pseudoclone_umap_gt)
+```
+
+The left panel highlights cells sharing the seed's experimental barcode, while the right panel shows its inferred pseudoclone enrichment on the same coordinates. After building pCORAL embeddings, you can repeat this call with `reduction = "CORAL_cell_embed"` or `reduction = "CORAL_clone_embed"` to compare ground truth and inference in pCORAL space.
+
 ### 6. Build pCORAL Embeddings
 
 ```r
@@ -267,17 +300,39 @@ seurat_obj <- CORALembedding(
 )
 ```
 
-`CORALembedding()` reads log-normalized expression data from `RNA/data` to construct low-dimensional cell and pseudoclone embeddings (if the core scan used another assay, ensure that `RNA/data` contains the matching expression matrix and gene set).
-
-This step populates the Seurat object with:
+`CORALembedding()` reads log-normalized expression data from `RNA/data` to construct low-dimensional cell and pseudoclone embeddings. This step populates the Seurat object with:
 
 - `CORAL_cell_embed`: expression-projected cell coordinates;
 - `CORAL_clone_embed`: pseudoclone-probability-weighted coordinates;
 - `seurat_obj@misc$isCORAL_embedding`: model artifacts, probability matrices, and parameter provenance.
 
-### 7. Visualize Pseudoclones in pCORAL Space
+Plot both embeddings:
 
 ```r
+p_pcoral_cell <- PlotCORALEmbedding(seurat_obj, reduction = "CORAL_cell_embed")
+print(p_pcoral_cell)
+
+p_pcoral_clone <- PlotCORALEmbedding(seurat_obj, reduction = "CORAL_clone_embed")
+print(p_pcoral_clone)
+```
+
+`PlotCORALEmbedding()` plots dimensions 1–2 by default, using filled points for cell embeddings and open circles for clone embeddings. Colors follow Seurat identities, or can be customized via `group_by`.
+
+### 7. Visualize Pseudoclones in pCORAL Space
+
+Display the same seed's pseudoclone enrichment in both pCORAL spaces to compare with the original transcriptomic UMAP:
+
+```r
+p_pseudoclone_pcoral_cell <- PlotPseudoclone(
+  seurat_obj = seurat_obj,
+  seed_cell = seed_cell,
+  binsize_key = binsize_key,
+  reduction = "CORAL_cell_embed",
+  show_ground_truth = FALSE
+)
+
+print(p_pseudoclone_pcoral_cell)
+
 p_pseudoclone_pcoral <- PlotPseudoclone(
   seurat_obj = seurat_obj,
   seed_cell = seed_cell,
@@ -288,8 +343,6 @@ p_pseudoclone_pcoral <- PlotPseudoclone(
 
 print(p_pseudoclone_pcoral)
 ```
-
-Reusing the same `seed_cell` in `CORAL_clone_embed` space allows a direct visual comparison between the standard transcriptomic UMAP and the lineage-informed pCORAL representation.
 
 ### 8. Detect Metaclones
 
@@ -313,9 +366,32 @@ seurat_obj <- FindMetaclone(
 table(seurat_obj$metaclone)
 ```
 
-Adjust `resolution` to tune community granularity for your dataset.
+Visualize the resulting Metaclone labels on the first two dimensions of `CORAL_clone_embed` (combining an overall landscape with per-Metaclone facets):
 
-To use Leiden (`algorithm = 4`), first run `install.packages("leidenbase")`. `FindMetaclone()` never installs software from the network at runtime; when `leidenbase` is unavailable, or the installed Seurat version does not support its Leiden implementation, the function warns and falls back to Louvain (`algorithm = 1`). Leiden and Louvain results should not be assumed to be numerically equivalent.
+```r
+p_metaclone <- PlotMetacloneLandscape(
+  seurat_obj = seurat_obj,
+  reduction = "CORAL_clone_embed",
+  cluster_col = "metaclone"
+)
+
+print(p_metaclone)
+```
+
+To view a selected Metaclone's seeds and inferred sisters in cell space:
+
+```r
+p_metaclone_cells <- PlotMetaclone(
+  seurat_obj = seurat_obj,
+  metaclone_id = "2",            # Replace with the Metaclone to display
+  reduction = "CORAL_cell_embed",
+  cluster_col = "metaclone"
+)
+
+print(p_metaclone_cells)
+```
+
+Adjust `resolution` to tune community granularity for your dataset. Note that Leiden clustering (`algorithm = 4`) requires the `leidenbase` package (`install.packages("leidenbase")`); if unavailable, `FindMetaclone()` falls back to Louvain (`algorithm = 1`).
 
 ## Reproducibility
 
@@ -340,9 +416,9 @@ Please report bugs or questions via GitHub Issues.
 ## Development Tools
 This project leverages modern development tools to ensure code quality and efficiency. While developers write the initial code implementations, Generative AI and automated harnesses are used as assistants for tasks including:
 
-* **Code Completion & Expansion:** Fleshing out human-written code prototypes, adding boilerplate, and completing edge-case handling.
-* **Code Formatting & Refinement:** Ensuring a consistent style and clean structure across the codebase.
-* **Comment Generation:** Improving code readability and inline documentation.
-* **Proofreading:** Refining documentation and text within the project.
+- **Code Completion & Expansion:** Fleshing out human-written code prototypes, adding boilerplate, and completing edge-case handling.
+- **Code Formatting & Refinement:** Ensuring a consistent style and clean structure across the codebase.
+- **Comment Generation:** Improving code readability and inline documentation.
+- **Proofreading:** Refining documentation and text within the project.
 
 All conceptual ideation, architectural decisions, and foundational code implementations are entirely developer-authored and reviewed.
