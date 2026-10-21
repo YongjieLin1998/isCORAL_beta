@@ -413,6 +413,12 @@ Please report bugs or questions via GitHub Issues.
 
 ## Citation
 
+If you find this package helpful in your research, we would greatly appreciate it if you could consider citing our following work.
+
+Virtual lineages: in silico lineage tracing from single-cell and spatial transcriptomes
+Yongjie Lin, Yihan Lin
+bioRxiv 2026.10.19.760045; doi: https://doi.org/10.64898/2026.10.19.760045
+
 ## Development Tools
 This project leverages modern development tools to ensure code quality and efficiency. While developers write the initial code implementations, Generative AI and automated harnesses are used as assistants for tasks including:
 
