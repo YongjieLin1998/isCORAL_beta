@@ -2,8 +2,9 @@
 
 
 ## Development and Feedback
-We are working to improve isCORAL and add new functions. Thus, your feedback and suggestions are very welcome. If you need a new specific function or find something not working, just let us know and we'll fix it.
-
+isCORAL is currently in beta. 
+Please note that APIs and tutorials are subject to change as we actively improve the library and add new features. We warmly welcome your feedback and suggestions! 
+If you encounter any bugs or have a specific feature request, please let us know—we’d love to hear from you and get it sorted out.
 Contact: Yongjie Lin (linyjie@pku.edu.cn)
 
 
