@@ -20,6 +20,8 @@
 #'   subsampling, and cross-validation steps. The default is \code{NULL}, which
 #'   does not reset the caller's random-number generator and preserves the
 #'   stochastic behavior of version 6.1.4.
+#' @param verbose Whether to print routine progress messages. Defaults to
+#'   \code{FALSE}; warnings and errors are not suppressed.
 #' 
 #' @return A Seurat object containing two standard dimensional reductions and
 #'   a backward-compatible persistent cache in
@@ -38,7 +40,8 @@ CORALembedding <- function(
     max_cells_lasso = NULL,          
     alpha_elasticnet = 0.05, 
     workers_glmnet = 5,
-    random_seed = NULL
+    random_seed = NULL,
+    verbose = FALSE
 ) {
   embedding_call <- match.call()
 
@@ -108,11 +111,11 @@ CORALembedding <- function(
   if (!is.null(random_seed)) set.seed(random_seed)
   rng_state_after_seed <- capture_rng_state()
 
-  old_omp <- Sys.getenv("OMP_NUM_THREADS")
-  Sys.setenv(OMP_NUM_THREADS = 1) 
-  on.exit({ Sys.setenv(OMP_NUM_THREADS = old_omp) }, add = TRUE)
+  old_omp <- Sys.getenv("OMP_NUM_THREADS", unset = NA_character_)
+  Sys.setenv(OMP_NUM_THREADS = "1")
+  on.exit(.isCORAL_restore_omp_threads(old_omp), add = TRUE)
   
-  message("🚀 [isCORAL] Initiating unified manifold embedding pipeline...")
+  if (verbose) message("🚀 [isCORAL] Initiating unified manifold embedding pipeline...")
   
   coral_misc_key <- ifelse(
     "CORAL_scan_results" %in% names(seurat_obj@misc),
@@ -303,10 +306,10 @@ CORALembedding <- function(
   rng_state_before_subsampling <- capture_rng_state()
   if (do_subsample) {
     train_idx <- base::sample(1:nrow(X_scaled), max_cells_lasso)
-    message(sprintf("📉 [isCORAL] Subsampling enabled: Randomly selected %d cells for ElasticNet training.", max_cells_lasso))
+    if (verbose) message(sprintf("📉 [isCORAL] Subsampling enabled: Randomly selected %d cells for ElasticNet training.", max_cells_lasso))
   } else {
     train_idx <- 1:nrow(X_scaled)
-    message(sprintf("📈 [isCORAL] Subsampling bypassed: Using all %d cells for ElasticNet training.", length(train_idx)))
+    if (verbose) message(sprintf("📈 [isCORAL] Subsampling bypassed: Using all %d cells for ElasticNet training.", length(train_idx)))
   }
   rng_state_after_subsampling <- capture_rng_state()
   training_cells <- valid_cells[train_idx]
@@ -464,7 +467,8 @@ CORALembedding <- function(
       max_cells_lasso = max_cells_lasso,
       alpha_elasticnet = alpha_elasticnet,
       workers_glmnet = workers_glmnet,
-      random_seed = random_seed
+      random_seed = random_seed,
+      verbose = verbose
     ),
     effective_parameters = list(
       scan_misc_key = coral_misc_key,
@@ -577,7 +581,8 @@ CORALembedding <- function(
         after = foreach_backend_after
       ),
       omp_num_threads_before = old_omp,
-      omp_num_threads_during = "1"
+      omp_num_threads_during = "1",
+      omp_num_threads_after = .isCORAL_normalize_omp_threads(old_omp)
     ),
     outputs = list(
       cell_reduction = "CORAL_cell_embed",

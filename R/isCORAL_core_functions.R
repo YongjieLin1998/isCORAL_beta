@@ -396,6 +396,9 @@ run_simple_consensus <- function(intermediate_results, num_cells, cell_names) {
 #' @param nmf_eval_downsample_cells Optional number of cells used during NMF
 #'   feature evaluation.
 #' @param custom_log_file Optional path for the progress log.
+#' @param verbose Whether to print routine progress and Seurat object-update
+#'   messages. Defaults to \code{FALSE}. File logging, warnings, and errors
+#'   remain enabled.
 #' @return A Seurat object with isCORAL scan results stored in
 #'   \code{seurat_obj@misc$CORAL_scan_results}.
 #' @export
@@ -436,7 +439,8 @@ isCORAL <- function(seurat_obj,
                            downsample_gemli_ratio = 1,
                            specc_kernel = "laplacedot",
                            nmf_eval_downsample_cells = NULL,
-                           custom_log_file = NULL) {
+                           custom_log_file = NULL,
+                           verbose = FALSE) {
   
   start_time_total <- Sys.time()
   input_mode <- match.arg(input_mode)
@@ -460,19 +464,21 @@ isCORAL <- function(seurat_obj,
   cat(sprintf("=== isCORAL HPC Run Started at %s ===\n", start_time_total), file = progress_log_file)
   cat(sprintf("Target: %d repeats, %d cores. Wait for workers to report...\n", n_repeats, parallel_cores), file = progress_log_file, append = TRUE)
   
-  message(paste("--- [isCORAL beta 1.0.0 CALLR HPC EDITION] Run UID:", global_run_uid, "---"))
-  message(">>> REAL-TIME PROGRESS LOG: ", progress_log_file, " <<<")
-  message(">>> TIP: In your Linux terminal, run: tail -f ", progress_log_file, " <<<")
+  if (verbose) message(paste("--- [isCORAL beta 1.0.0 CALLR HPC EDITION] Run UID:", global_run_uid, "---"))
+  if (verbose) message(">>> REAL-TIME PROGRESS LOG: ", progress_log_file, " <<<")
+  if (verbose) message(">>> TIP: In your Linux terminal, run: tail -f ", progress_log_file, " <<<")
   # ----------------------------------------------------------------------------
   
   run_parameters <- as.list(environment())
   run_parameters$seurat_obj <- NULL
   
   if (is.null(assay)) assay <- Seurat::DefaultAssay(seurat_obj)
-  seurat_obj <- SeuratObject::UpdateSeuratObject(seurat_obj)
+  seurat_obj <- .isCORAL_with_seurat_output(
+    SeuratObject::UpdateSeuratObject(seurat_obj), verbose = verbose
+  )
   
   if (!is.null(max_cells) && ncol(seurat_obj) > max_cells) {
-    message(paste("Downsampling to", max_cells, "cells."))
+    if (verbose) message(paste("Downsampling to", max_cells, "cells."))
     seurat_obj <- subset(seurat_obj, cells = sample(colnames(seurat_obj), size = max_cells, replace = FALSE))
   }
   num_cells_for_analysis <- ncol(seurat_obj)
@@ -489,14 +495,14 @@ isCORAL <- function(seurat_obj,
     }
     
     if (!is.null(downsampleUMI) && is.numeric(downsampleUMI)) {
-      message(paste("Performing UMI downsampling to", downsampleUMI, "..."))
+      if (verbose) message(paste("Performing UMI downsampling to", downsampleUMI, "..."))
       downsampled_counts <- Seurat::SampleUMI(original_counts, max.umi = downsampleUMI, upsample = FALSE, verbose = FALSE)
       seurat_obj <- .isCORAL_set_assay_layer(seurat_obj, assay = assay, layer = "counts", mat = downsampled_counts)
       rm(downsampled_counts)
     }
     rm(original_counts)
     
-    message("Input mode: raw_counts. Applying Seurat::NormalizeData() before isCORAL.")
+    if (verbose) message("Input mode: raw_counts. Applying Seurat::NormalizeData() before isCORAL.")
     seurat_obj <- Seurat::NormalizeData(seurat_obj, assay = assay, verbose = FALSE)
     sc_expression_full <- .isCORAL_get_assay_layer(seurat_obj, assay = assay, layer = "data", required = TRUE)
     normalization_applied <- "Seurat::NormalizeData"
@@ -506,7 +512,7 @@ isCORAL <- function(seurat_obj,
       warning("downsampleUMI is ignored when input_mode = 'pre_normalized_data'.", call. = FALSE)
     }
     
-    message(sprintf(
+    if (verbose) message(sprintf(
       "Input mode: pre_normalized_data. Skipping NormalizeData() and reading assay layer '%s/%s'.",
       assay, pre_normalized_layer
     ))
@@ -528,7 +534,7 @@ isCORAL <- function(seurat_obj,
   run_parameters$normalization_applied <- normalization_applied
   run_parameters$expression_layer_used <- expression_layer_used
   
-  message("Calculating gene statistics...")
+  if (verbose) message("Calculating gene statistics...")
   the_means <- Matrix::rowMeans(sc_expression_full)
   
   temp_sq <- sc_expression_full
@@ -569,7 +575,7 @@ isCORAL <- function(seurat_obj,
   bin_size_values <- bin_size
   all_scan_results <- list(run_parameters = run_parameters)
   
-  message("Packaging payload to avoid excessive memory usage...")
+  if (verbose) message("Packaging payload to avoid excessive memory usage...")
   
   helper_funcs <- list(
     CalculateGeneOmegaSquared = CalculateGeneOmegaSquared,
@@ -600,7 +606,7 @@ isCORAL <- function(seurat_obj,
     )
   )
   
-  message(paste("Launching isolated callr backend with", payload$params$parallel_cores, "cores. Main process standing by..."))
+  if (verbose) message(paste("Launching isolated callr backend with", payload$params$parallel_cores, "cores. Main process standing by..."))
   
   # ============================================================================
   # Launch callr Background Process
@@ -609,6 +615,18 @@ isCORAL <- function(seurat_obj,
     
     list2env(data$funcs, envir = globalenv())
     
+    # ----------------------------------------------------------------------
+    # Suppress underlying implicit multi-threading 
+    # to prevent thread collisions with doMC. These values are also supplied
+    # in callr's startup environment, before R or compiled libraries load.
+    # ----------------------------------------------------------------------
+    Sys.setenv(OMP_NUM_THREADS = "1")
+    Sys.setenv(OPENBLAS_NUM_THREADS = "1")
+    Sys.setenv(MKL_NUM_THREADS = "1")
+    Sys.setenv(VECLIB_MAXIMUM_THREADS = "1")
+    Sys.setenv(NUMEXPR_NUM_THREADS = "1")
+    Sys.setenv(RCPP_PARALLEL_NUM_THREADS = "1")
+
     suppressPackageStartupMessages({
       library(Matrix)
       library(doMC)
@@ -619,17 +637,6 @@ isCORAL <- function(seurat_obj,
       library(RcppML)
       library(doRNG)
     })
-    
-    # ----------------------------------------------------------------------
-    # Suppress underlying implicit multi-threading 
-    # to prevent thread collisions with doMC
-    # ----------------------------------------------------------------------
-    Sys.setenv(OMP_NUM_THREADS = "1")
-    Sys.setenv(OPENBLAS_NUM_THREADS = "1")
-    Sys.setenv(MKL_NUM_THREADS = "1")
-    Sys.setenv(VECLIB_MAXIMUM_THREADS = "1")
-    Sys.setenv(NUMEXPR_NUM_THREADS = "1")
-    Sys.setenv(RCPP_PARALLEL_NUM_THREADS = "1")
     
     if (requireNamespace("RhpcBLASctl", quietly = TRUE)) {
       RhpcBLASctl::blas_set_num_threads(1)
@@ -762,10 +769,11 @@ isCORAL <- function(seurat_obj,
     
     return(results_internal)
     
-  }, args = list(data = payload), show = TRUE) 
+  }, args = list(data = payload), show = TRUE,
+     env = .isCORAL_callr_thread_env())
   # ============================================================================
   
-  message("\nBackground processing complete. Integrating results into Seurat...")
+  if (verbose) message("\nBackground processing complete. Integrating results into Seurat...")
   
   rm(payload, helper_funcs)
   gc(verbose = FALSE, reset = TRUE)
@@ -823,7 +831,7 @@ isCORAL <- function(seurat_obj,
   
   seurat_obj@misc$CORAL_scan_results <- all_scan_results
   total_time_secs <- as.numeric(difftime(Sys.time(), start_time_total, units = "secs"))
-  message(paste("\nFull analysis scan complete. Total time:", round(total_time_secs, 2), "seconds")) 
+  if (verbose) message(paste("\nFull analysis scan complete. Total time:", round(total_time_secs, 2), "seconds"))
   
   suppressWarnings({
     if (exists("sc_expression_full")) rm(sc_expression_full)

@@ -51,7 +51,9 @@ When supplied, this matrix is used instead of reading \code{S_stab} from
 
 \item{reduction}{Dimensional reduction to plot. If \code{NULL}, the function uses
 the first available reduction among \code{"umap.raw"}, \code{"umap"},
-\code{"CORAL_clone_embed"}, and \code{"CORAL_cell_embed"}.}
+\code{"CORAL_clone_embed"}, and \code{"CORAL_cell_embed"}.
+In clone space, background and inferred cells use open circles;
+seed and ground-truth markers retain their filled shapes.}
 
 \item{invalid_clones}{Clone labels to ignore when selecting seeds by clone.}
 

@@ -26,6 +26,8 @@
 #' @param reduction Dimensional reduction to plot. If `NULL`, the function uses
 #'   the first available reduction among `"umap.raw"`, `"umap"`,
 #'   `"CORAL_clone_embed"`, and `"CORAL_cell_embed"`.
+#'   In clone space, background and inferred cells use open circles;
+#'   seed and ground-truth markers retain their filled shapes.
 #' @param invalid_clones Clone labels to ignore when selecting seeds by clone.
 #' @param min_enrichment Cells below this fold-enrichment are shown as
 #'   background.
@@ -133,6 +135,7 @@ PlotPseudoclone <- function(
   }
 
   reduction <- .iscoral_choose_reduction(seurat_obj, reduction)
+  point_shape <- if (identical(reduction, "CORAL_clone_embed")) 1 else 19
   embedding <- Seurat::Embeddings(seurat_obj, reduction)
   if (ncol(embedding) < 2) {
     stop(sprintf("Reduction '%s' must contain at least two dimensions.", reduction), call. = FALSE)
@@ -213,7 +216,8 @@ PlotPseudoclone <- function(
     seed_size = seed_size,
     min_enrichment = min_enrichment,
     max_enrichment = max_enrichment,
-    title = title
+    title = title,
+    point_shape = point_shape
   )
 
   ground_truth_df <- NULL
@@ -234,7 +238,8 @@ PlotPseudoclone <- function(
       colors = colors,
       background_color = background_color,
       point_size = point_size,
-      seed_size = seed_size
+      seed_size = seed_size,
+      point_shape = point_shape
     )
     plot_out <- patchwork::wrap_plots(p_gt, p_pred, nrow = 1, guides = "collect") &
       ggplot2::theme(legend.position = "bottom")
@@ -495,7 +500,8 @@ PlotPseudoclone <- function(
     seed_size,
     min_enrichment,
     max_enrichment,
-    title
+    title,
+    point_shape = 19
 ) {
   lineage_colors <- c("Seed A" = colors[[1]], "Seed B" = colors[[2]])
   seed_shapes <- c(21, 24)
@@ -506,12 +512,14 @@ PlotPseudoclone <- function(
     ggplot2::geom_point(
       data = prediction_df[prediction_df$Assigned_Lineage == "Background", , drop = FALSE],
       color = background_color,
-      size = point_size
+      size = point_size,
+      shape = point_shape
     ) +
     ggplot2::geom_point(
       data = prediction_df[prediction_df$Assigned_Lineage != "Background", , drop = FALSE],
       ggplot2::aes(color = .data$Assigned_Lineage, alpha = .data$Dominant_E),
-      size = point_size * 1.25
+      size = point_size * 1.25,
+      shape = point_shape
     ) +
     ggplot2::scale_color_manual(
       name = "Pseudoclone",
@@ -583,7 +591,8 @@ PlotPseudoclone <- function(
     colors,
     background_color,
     point_size,
-    seed_size
+    seed_size,
+    point_shape = 19
 ) {
   gt_colors <- c("Seed A clone" = colors[[1]], "Seed B clone" = colors[[2]])
   seed_shapes <- c(21, 24)
@@ -595,7 +604,8 @@ PlotPseudoclone <- function(
     ggplot2::geom_point(
       data = ground_truth_df[ground_truth_df$GT_Label == "Other", , drop = FALSE],
       color = background_color,
-      size = point_size
+      size = point_size,
+      shape = point_shape
     ) +
     ggplot2::geom_point(
       data = ground_truth_df[ground_truth_df$GT_Label != "Other", , drop = FALSE],

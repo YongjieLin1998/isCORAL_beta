@@ -218,11 +218,21 @@ PlotMemoryGenes <- function(
 #' @param top_n Number of highest-ranking experimental omega-squared genes used
 #'   as the positive class for the benchmark metrics. The default reproduces
 #'   the benchmark definition of the top 2,000 memory genes.
+#' @param make_plots If `TRUE`, also return formatted scatter, ROC, and
+#'   precision-recall ggplot objects. No plots are printed or saved automatically.
+#' @param label_top_n Number of true-positive genes to label on the scatter,
+#'   ranked by inferred memory score. Set to `0` to omit gene labels.
+#' @param base_size Base font size for the benchmark plots.
+#' @param base_family Font family for the benchmark plots. Use `"sans"` if
+#'   Arial is unavailable on the plotting device.
 #'
 #' @return A list containing `comparison`, the aligned gene-level table;
 #'   `summary`, the benchmark metrics and resolved parameters; `roc_curve` and
-#'   `pr_curve`, the threshold-level curve coordinates; and the resolved scan
-#'   result identifiers.
+#'   `pr_curve`, the threshold-level curve coordinates; `plots`, with `scatter`,
+#'   `roc`, and `pr` ggplot objects; `plot_data`, a copy of `comparison` with
+#'   `predicted_high` and `classification` columns; `plot_parameters`, the
+#'   display settings and thresholds; and the resolved scan result identifiers.
+#'   With `make_plots = FALSE`, all three `plots` entries are `NULL`.
 #' @details
 #' This function does not calculate experimental ground truth and does not
 #' modify the Seurat object. Run `calculate_heritable_genes()` first with the
@@ -232,7 +242,23 @@ PlotMemoryGenes <- function(
 #' top experimental omega-squared genes as the positive class, following the
 #' package's memory-gene benchmark workflow. If the filtered comparison has no
 #' positive or no negative genes, classification metrics are returned as `NA`
-#' with a warning, while continuous-score metrics remain available.
+#' with a warning, while continuous-score metrics and an unclassified scatter
+#' remain available; `plots$roc` and `plots$pr` are then `NULL`.
+#'
+#' Scatter colors and shapes identify true positives (TP), true negatives (TN),
+#' false positives (FP), and false negatives (FN), using `is_high_truth` and
+#' `inferred_memory_score >= best_threshold`. The horizontal line is the
+#' maximum-F1 inferred-score threshold. The vertical line is the minimum
+#' omega-squared in the eligible top-`top_n` ground-truth set, not the
+#' permutation threshold. Ties at that boundary retain the existing
+#' `ground_truth_rank` assignments and are recorded in
+#' `plot_parameters$truth_cutoff_tied`; the line alone does not separate tied
+#' genes. The scatter also includes an identity line and a descriptive linear
+#' fit when the ground-truth scores vary. ROC and PR paths follow the returned
+#' threshold coordinates without changing metric integration. Their dashed
+#' random references are the ROC diagonal and the positive-class prevalence,
+#' respectively; a diamond marks maximum F1 on the PR curve. Metrics remain in
+#' `summary`, rather than being added as plot annotations.
 #' @examples
 #' \dontrun{
 #' seurat_obj <- calculate_heritable_genes(
@@ -248,6 +274,9 @@ PlotMemoryGenes <- function(
 #' )
 #' comparison$summary
 #' head(comparison$comparison)
+#' print(comparison$plots$scatter)
+#' print(comparison$plots$roc)
+#' print(comparison$plots$pr)
 #' }
 #' @export
 CompareMemoryScores <- function(
@@ -255,7 +284,11 @@ CompareMemoryScores <- function(
     binsize_key = NULL,
     assay = NULL,
     min_mean = 0.1,
-    top_n = 2000
+    top_n = 2000,
+    make_plots = TRUE,
+    label_top_n = 5,
+    base_size = 18,
+    base_family = "Arial"
 ) {
   if (!is.numeric(min_mean) || length(min_mean) != 1L ||
       is.na(min_mean) || !is.finite(min_mean)) {
@@ -267,6 +300,25 @@ CompareMemoryScores <- function(
     stop("'top_n' must be one positive integer.", call. = FALSE)
   }
   top_n <- as.integer(top_n)
+  if (!is.logical(make_plots) || length(make_plots) != 1L ||
+      is.na(make_plots)) {
+    stop("'make_plots' must be TRUE or FALSE.", call. = FALSE)
+  }
+  if (!is.numeric(label_top_n) || length(label_top_n) != 1L ||
+      is.na(label_top_n) || !is.finite(label_top_n) || label_top_n < 0 ||
+      label_top_n != floor(label_top_n) ||
+      label_top_n > .Machine$integer.max) {
+    stop("'label_top_n' must be one non-negative integer.", call. = FALSE)
+  }
+  label_top_n <- as.integer(label_top_n)
+  if (!is.numeric(base_size) || length(base_size) != 1L ||
+      is.na(base_size) || !is.finite(base_size) || base_size <= 0) {
+    stop("'base_size' must be one positive finite number.", call. = FALSE)
+  }
+  if (!is.character(base_family) || length(base_family) != 1L ||
+      is.na(base_family) || !nzchar(base_family)) {
+    stop("'base_family' must be one non-empty font family.", call. = FALSE)
+  }
 
   if (is.null(assay)) {
     assay <- SeuratObject::DefaultAssay(seurat_obj)
@@ -511,6 +563,45 @@ CompareMemoryScores <- function(
     stringsAsFactors = FALSE
   )
 
+  # Add display-only classification without changing the existing result tables.
+  plot_data <- comparison
+  plot_data$predicted_high <- rep(NA, nrow(comparison))
+  plot_data$classification <- rep(NA_character_, nrow(comparison))
+  if (is.finite(curve_results$best_threshold)) {
+    plot_data$predicted_high <-
+      plot_data$inferred_memory_score >= curve_results$best_threshold
+    plot_data$classification <- ifelse(
+      plot_data$is_high_truth,
+      ifelse(plot_data$predicted_high, "TP", "FN"),
+      ifelse(plot_data$predicted_high, "FP", "TN")
+    )
+  }
+  truth_cutoff <- min(
+    eligible_genes$Omega_square[eligible_genes$is_high_truth]
+  )
+  truth_cutoff_tied <- any(
+    !eligible_genes$is_high_truth & eligible_genes$Omega_square == truth_cutoff
+  )
+  plot_parameters <- list(
+    make_plots = make_plots,
+    label_top_n = label_top_n,
+    base_size = base_size,
+    base_family = base_family,
+    benchmark_truth_cutoff = truth_cutoff,
+    truth_cutoff_tied = truth_cutoff_tied,
+    inferred_threshold = curve_results$best_threshold
+  )
+  plots <- list(scatter = NULL, roc = NULL, pr = NULL)
+  if (make_plots) {
+    plots <- .iscoral_plot_memory_score_comparison(
+      plot_data = plot_data,
+      roc_curve = curve_results$roc_curve,
+      pr_curve = curve_results$pr_curve,
+      summary_table = summary_table,
+      plot_parameters = plot_parameters
+    )
+  }
+
   list(
     comparison = comparison,
     summary = summary_table,
@@ -521,7 +612,10 @@ CompareMemoryScores <- function(
     assay = assay,
     layer = "data",
     min_mean = min_mean,
-    top_n = top_n
+    top_n = top_n,
+    plots = plots,
+    plot_data = plot_data,
+    plot_parameters = plot_parameters
   )
 }
 

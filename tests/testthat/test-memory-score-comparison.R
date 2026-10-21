@@ -93,6 +93,19 @@ test_that("CompareMemoryScores aligns and summarizes memory scores", {
   expect_identical(result$assay, "RNA")
   expect_identical(result$layer, "data")
   expect_identical(result$top_n, 1L)
+  expect_s3_class(result$plots$scatter, "ggplot")
+  expect_s3_class(result$plots$roc, "ggplot")
+  expect_s3_class(result$plots$pr, "ggplot")
+  expect_identical(result$plots$roc$data, result$roc_curve)
+  expect_identical(result$plots$pr$data, result$pr_curve)
+  expect_identical(result$plot_data$predicted_high, c(TRUE, FALSE))
+  expect_identical(result$plot_data$classification, c("TP", "TN"))
+  expect_identical(
+    result$plot_data[, colnames(result$comparison), drop = FALSE],
+    result$comparison
+  )
+  expect_equal(result$plot_parameters$benchmark_truth_cutoff, 0.7)
+  expect_false(result$plot_parameters$truth_cutoff_tied)
 })
 
 test_that("CompareMemoryScores requires calculated experimental ground truth", {
@@ -139,6 +152,11 @@ test_that("CompareMemoryScores reports an undefined single-class benchmark", {
   expect_true(is.na(result$summary$auprc))
   expect_true(is.na(result$summary$max_f1))
   expect_equal(result$summary$spearman_r, 1)
+  expect_s3_class(result$plots$scatter, "ggplot")
+  expect_null(result$plots$roc)
+  expect_null(result$plots$pr)
+  expect_true(all(is.na(result$plot_data$classification)))
+  expect_true(all(is.na(result$plot_data$predicted_high)))
 })
 
 test_that("CompareMemoryScores follows the benchmark curve integration", {
@@ -159,4 +177,40 @@ test_that("CompareMemoryScores follows the benchmark curve integration", {
   expect_equal(result$summary$auprc, 0.75)
   expect_equal(result$summary$max_f1, 2 / 3)
   expect_equal(result$summary$best_threshold, 0.2)
+})
+
+test_that("benchmark plotting options preserve the numerical comparison", {
+  skip_if_not_installed("Seurat")
+
+  object <- make_memory_score_comparison_object()
+  original_misc <- object@misc
+  plotted <- CompareMemoryScores(object, top_n = 1, label_top_n = 0)
+  tables_only <- CompareMemoryScores(object, top_n = 1, make_plots = FALSE)
+  original_fields <- c(
+    "comparison", "summary", "roc_curve", "pr_curve", "binsize_key",
+    "misc_key", "assay", "layer", "min_mean", "top_n"
+  )
+
+  expect_identical(plotted[original_fields], tables_only[original_fields])
+  expect_identical(plotted$plot_data, tables_only$plot_data)
+  expect_identical(tables_only$plots, list(scatter = NULL, roc = NULL, pr = NULL))
+  expect_identical(object@misc, original_misc)
+  expect_error(CompareMemoryScores(object, make_plots = NA), "'make_plots'")
+  expect_error(CompareMemoryScores(object, label_top_n = -1), "'label_top_n'")
+  expect_error(CompareMemoryScores(object, base_size = 0), "'base_size'")
+  expect_error(CompareMemoryScores(object, base_family = NA_character_), "'base_family'")
+})
+
+test_that("scatter classification preserves rank-based ground-truth cutoff ties", {
+  skip_if_not_installed("Seurat")
+
+  object <- make_memory_score_comparison_object()
+  object@misc$groundtruth$heritable_genes_df$Omega_square <- c(0.7, 0.7, 0.8, 0.4)
+  result <- CompareMemoryScores(object, top_n = 1)
+
+  expect_identical(result$comparison$name, c("geneA", "geneB"))
+  expect_identical(result$comparison$is_high_truth, c(TRUE, FALSE))
+  expect_equal(result$plot_parameters$benchmark_truth_cutoff, 0.7)
+  expect_true(result$plot_parameters$truth_cutoff_tied)
+  expect_identical(result$plot_data$classification, c("TP", "FP"))
 })

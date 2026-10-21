@@ -9,7 +9,11 @@ CompareMemoryScores(
   binsize_key = NULL,
   assay = NULL,
   min_mean = 0.1,
-  top_n = 2000
+  top_n = 2000,
+  make_plots = TRUE,
+  label_top_n = 5,
+  base_size = 18,
+  base_family = "Arial"
 )
 }
 \arguments{
@@ -31,12 +35,27 @@ benchmark filter \code{mean > 0.1}.}
 \item{top_n}{Number of highest-ranking experimental omega-squared genes used
 as the positive class for the benchmark metrics. The default reproduces the
 benchmark definition of the top 2,000 memory genes.}
+
+\item{make_plots}{If \code{TRUE}, also return formatted scatter, ROC, and
+precision-recall ggplot objects. No plots are printed or saved automatically.}
+
+\item{label_top_n}{Number of true-positive genes to label on the scatter,
+ranked by inferred memory score. Set to \code{0} to omit gene labels.}
+
+\item{base_size}{Base font size for the benchmark plots.}
+
+\item{base_family}{Font family for the benchmark plots. Use \code{"sans"} if
+Arial is unavailable on the plotting device.}
 }
 \value{
 A list containing \code{comparison}, the aligned gene-level table;
 \code{summary}, the benchmark metrics and resolved parameters;
 \code{roc_curve} and \code{pr_curve}, the threshold-level curve coordinates;
-and the resolved scan result identifiers.
+\code{plots}, with \code{scatter}, \code{roc}, and \code{pr} ggplot objects;
+\code{plot_data}, a copy of \code{comparison} with \code{predicted_high} and
+\code{classification} columns; \code{plot_parameters}, the display settings
+and thresholds; and the resolved scan result identifiers.
+With \code{make_plots = FALSE}, all three \code{plots} entries are \code{NULL}.
 }
 \description{
 Aligns isCORAL-inferred memory scores with the gene-wise omega-squared values
@@ -54,7 +73,24 @@ omega-squared scores. AUROC, AUPRC, AUPRC enrichment, and maximum F1 use the
 top experimental omega-squared genes as the positive class, following the
 package's memory-gene benchmark workflow. If the filtered comparison has no
 positive or no negative genes, classification metrics are returned as
-\code{NA} with a warning, while continuous-score metrics remain available.
+\code{NA} with a warning, while continuous-score metrics and an unclassified
+scatter remain available; \code{plots$roc} and \code{plots$pr} are then
+\code{NULL}.
+
+Scatter colors and shapes identify true positives (TP), true negatives (TN),
+false positives (FP), and false negatives (FN), using \code{is_high_truth} and
+\code{inferred_memory_score >= best_threshold}. The horizontal line is the
+maximum-F1 inferred-score threshold. The vertical line is the minimum
+omega-squared in the eligible top-\code{top_n} ground-truth set, not the
+permutation threshold. Ties at that boundary retain the existing
+\code{ground_truth_rank} assignments and are recorded in
+\code{plot_parameters$truth_cutoff_tied}; the line alone does not separate tied
+genes. The scatter also includes an identity line and a descriptive linear
+fit when the ground-truth scores vary. ROC and PR paths follow the returned
+threshold coordinates without changing metric integration. Their dashed
+random references are the ROC diagonal and the positive-class prevalence,
+respectively; a diamond marks maximum F1 on the PR curve. Metrics remain in
+\code{summary}, rather than being added as plot annotations.
 }
 \examples{
 \dontrun{
@@ -71,5 +107,8 @@ comparison <- CompareMemoryScores(
 )
 comparison$summary
 head(comparison$comparison)
+print(comparison$plots$scatter)
+print(comparison$plots$roc)
+print(comparison$plots$pr)
 }
 }

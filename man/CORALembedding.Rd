@@ -12,7 +12,8 @@ CORALembedding(
   max_cells_lasso = NULL,
   alpha_elasticnet = 0.05,
   workers_glmnet = 5,
-  random_seed = NULL
+  random_seed = NULL,
+  verbose = FALSE
 )
 }
 \arguments{
@@ -37,6 +38,9 @@ Default is `NULL` (subsampling disabled, uses all cells). Set to an integer (e.g
 subsampling, and cross-validation steps. The default is \code{NULL}, which
 does not reset the caller's random-number generator and preserves the
 stochastic behavior of version 6.1.4.}
+
+\item{verbose}{Whether to print routine progress messages. Defaults to
+\code{FALSE}; warnings and errors are not suppressed.}
 }
 \value{
 A Seurat object containing two standard dimensional reductions and a

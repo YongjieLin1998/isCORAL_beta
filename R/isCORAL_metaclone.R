@@ -120,6 +120,7 @@ GetMetacloneColors <- function(n, cluster_names) {
 #'   \code{Seurat::FindClusters()}; 4 requests Leiden and 1 requests Louvain.
 #' @param random_seed Random seed for community detection.
 #' @param verbose Whether to report graph construction and clustering progress.
+#'   Defaults to \code{FALSE}; warnings and errors remain visible.
 #' @return The modified Seurat object with Metaclone labels, neighbor graphs,
 #'   and a run record in \code{@misc$isCORAL_metaclone}.
 #' @details \code{FindMetaclone()} is the canonical beta 1.0.0 entry point.
@@ -130,7 +131,7 @@ GetMetacloneColors <- function(n, cluster_names) {
 FindMetaclone <- function(
     seurat_obj, resolution = 0.7, reduction = "CORAL_clone_embed",
     dims = 1:30, graph_prefix = "pcoral", cluster_col_name = "metaclone", 
-    algorithm = 4, random_seed = 42, verbose = TRUE
+    algorithm = 4, random_seed = 42, verbose = FALSE
 ) {
   metaclone_call <- match.call()
   
@@ -178,9 +179,11 @@ FindMetaclone <- function(
     ">>> [1/2] Building the topology graph (Reduction: %s, Dims: %s)...",
     reduction, paste(dims, collapse = ",")
   ))
-  seurat_obj <- Seurat::FindNeighbors(
-    seurat_obj, reduction = reduction, dims = dims, 
-    graph.name = c(nn_name, snn_name), verbose = FALSE
+  seurat_obj <- .isCORAL_with_seurat_output(
+    Seurat::FindNeighbors(
+      seurat_obj, reduction = reduction, dims = dims,
+      graph.name = c(nn_name, snn_name), verbose = FALSE
+    ), verbose = verbose
   )
   
   alg_name <- ifelse(algorithm == 4, "Leiden", ifelse(algorithm == 1, "Louvain", "Other"))
@@ -195,7 +198,9 @@ FindMetaclone <- function(
     verbose = verbose
   )
   if (algorithm == 4) find_clusters_args$leiden_method <- "leidenbase"
-  seurat_obj <- do.call(Seurat::FindClusters, find_clusters_args)
+  seurat_obj <- .isCORAL_with_seurat_output(
+    do.call(Seurat::FindClusters, find_clusters_args), verbose = verbose
+  )
   
   active_idents <- Seurat::Idents(seurat_obj)
   cluster_labels <- as.character(active_idents)
@@ -294,7 +299,7 @@ FindMetaclone <- function(
 FindMetaclones <- function(
     seurat_obj, resolution = 0.7, reduction = "CORAL_clone_embed",
     dims = 1:30, graph_prefix = "pcoral", cluster_col_name = "metaclone",
-    algorithm = 4, random_seed = 42, verbose = TRUE
+    algorithm = 4, random_seed = 42, verbose = FALSE
 ) {
   legacy_call <- match.call()
   .Deprecated("FindMetaclone", package = "isCORAL")

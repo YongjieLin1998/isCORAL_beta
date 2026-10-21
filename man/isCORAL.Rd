@@ -30,7 +30,8 @@ isCORAL(
   downsample_gemli_ratio = 1,
   specc_kernel = "laplacedot",
   nmf_eval_downsample_cells = NULL,
-  custom_log_file = NULL
+  custom_log_file = NULL,
+  verbose = FALSE
 )
 }
 \arguments{
@@ -59,6 +60,7 @@ isCORAL(
   \item{specc_kernel}{Kernel name passed to spectral clustering.}
   \item{nmf_eval_downsample_cells}{Optional number of cells used during NMF feature evaluation.}
   \item{custom_log_file}{Optional path for the progress log.}
+  \item{verbose}{Whether to print routine progress and Seurat object-update messages. Defaults to \code{FALSE}. File logging, warnings, and errors remain enabled.}
 }
 \value{
 A Seurat object with isCORAL scan results stored in

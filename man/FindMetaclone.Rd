@@ -12,7 +12,7 @@ FindMetaclone(
   cluster_col_name = "metaclone",
   algorithm = 4,
   random_seed = 42,
-  verbose = TRUE
+  verbose = FALSE
 )
 
 FindMetaclones(
@@ -24,7 +24,7 @@ FindMetaclones(
   cluster_col_name = "metaclone",
   algorithm = 4,
   random_seed = 42,
-  verbose = TRUE
+  verbose = FALSE
 )
 }
 \arguments{
@@ -39,7 +39,8 @@ FindMetaclones(
   \item{cluster_col_name}{Metadata column receiving the Metaclone labels.}
   \item{algorithm}{Clustering algorithm passed to \code{Seurat::FindClusters()}; \code{4} requests Leiden and \code{1} requests Louvain.}
   \item{random_seed}{Random seed for community detection.}
-  \item{verbose}{Whether to report graph construction and clustering progress.}
+  \item{verbose}{Whether to report graph construction and clustering progress.
+  Defaults to \code{FALSE}; warnings and errors remain visible.}
 }
 \value{The modified Seurat object with Metaclone labels, neighbor graphs, and
 a run record in \code{@misc$isCORAL_metaclone}.}
